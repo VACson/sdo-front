@@ -1,39 +1,62 @@
-import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
-import { useFonts } from 'expo-font';
-import { Stack } from 'expo-router';
-import * as SplashScreen from 'expo-splash-screen';
-import { StatusBar } from 'expo-status-bar';
-import { useEffect } from 'react';
-import 'react-native-reanimated';
+import Header from '@/components/Header'
+import AsyncStorage from '@react-native-async-storage/async-storage'
+import { useRoute } from '@react-navigation/native'
+import axios from 'axios'
+import { Stack, usePathname, useRouter } from 'expo-router'
+import { useEffect, useState } from 'react'
 
-import { useColorScheme } from '@/hooks/useColorScheme';
+export default function Layout() {
+	const [loading, setLoading] = useState(true)
+	const router = useRouter()
 
-// Prevent the splash screen from auto-hiding before asset loading is complete.
-SplashScreen.preventAutoHideAsync();
+	const pathname = usePathname()
+	useEffect(() => {
+		const checkToken = async () => {
+			try {
+				const token = await AsyncStorage.getItem('auth_token')
 
-export default function RootLayout() {
-  const colorScheme = useColorScheme();
-  const [loaded] = useFonts({
-    SpaceMono: require('../assets/fonts/SpaceMono-Regular.ttf'),
-  });
+				if (token) {
+					axios.defaults.headers.common['Authorization'] = `Bearer ${token}`
+					if (pathname === '/login') {
+						router.push('/')
+					}
+				} else {
+					router.push('/login')
+				}
+			} catch (error) {
+				router.push('/login')
+			} finally {
+				setLoading(false)
+			}
+		}
 
-  useEffect(() => {
-    if (loaded) {
-      SplashScreen.hideAsync();
-    }
-  }, [loaded]);
+		checkToken()
+	}, [])
 
-  if (!loaded) {
-    return null;
-  }
+	return (
+		<Stack
+			screenOptions={{
+				header: () => <Header title="My App" /> // Додаємо хедер
+			}}
+		>
+			<Stack.Screen
+				name="(auth)/login"
+				options={{ title: 'Login' }}
+			/>
+			<Stack.Screen
+				name="(tabs)/index"
+				options={{ title: 'Home' }}
+			/>
 
-  return (
-    <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-      <Stack>
-        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-        <Stack.Screen name="+not-found" />
-      </Stack>
-      <StatusBar style="auto" />
-    </ThemeProvider>
-  );
+			<Stack.Screen
+				name="day/[uuid]"
+				options={{ title: 'Деталі дня' }}
+			/>
+
+			<Stack.Screen
+				name="profile"
+				options={{ title: 'Профіль' }}
+			/>
+		</Stack>
+	)
 }
