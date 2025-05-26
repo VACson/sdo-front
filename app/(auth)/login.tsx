@@ -1,112 +1,193 @@
-import React from 'react'
-import { View, StyleSheet } from 'react-native'
-import { TextInput, Button, Text } from 'react-native-paper'
+import React, { useState } from 'react'
+import { View, StyleSheet, ActivityIndicator } from 'react-native'
 import { useForm, Controller } from 'react-hook-form'
 import { useRouter } from 'expo-router'
-import axios from 'axios'
-import AsyncStorage from '@react-native-async-storage/async-storage'
+
+// Імпортуємо сервіс для роботи з аутентифікацією
+import { login, LoginData } from '@/services/authService'
+
+// Імпортуємо компоненти з shadcn/ui
+import { Text } from '@/components/Text'
+import { Input } from '@/components/Input'
+import { Button } from '@/components/Button'
+import { Label } from '@/components/Label'
+import { Alert, AlertTitle, AlertDescription } from '@/components/Alert'
 
 export default function LoginScreen() {
 	const {
 		control,
 		handleSubmit,
 		formState: { errors }
-	} = useForm()
+	} = useForm({
+		mode: 'onChange' // Валідація при зміні
+	})
 	const router = useRouter()
 
+	const [loading, setLoading] = useState(false)
+	const [apiError, setApiError] = useState<string | null>(null)
+	const [networkError, setNetworkError] = useState<boolean>(false)
+
 	const onSubmit = async (data: any) => {
+		setLoading(true)
+		setApiError(null)
+		setNetworkError(false)
+
 		try {
-			const response = await axios.post('http://localhost:8000/auth/login', {
+			// Використовуємо сервіс для авторизації
+			await login({
 				email: data.email,
 				password: data.password
 			})
 
-			const token = response.data.access_token
+			router.push('/')
+		} catch (error: any) {
+			console.error('Login error:', error)
 
-			if (token) {
-				await AsyncStorage.setItem('auth_token', token)
-
-				axios.defaults.headers['Authorization'] = `Bearer ${token}`
-				router.push('/')
+			if (error.response) {
+				// Помилка від сервера з відповіддю
+				if (error.response.status === 401) {
+					setApiError('Невірний email або пароль. Спробуйте ще раз.')
+				} else if (error.response.data && error.response.data.message) {
+					setApiError(error.response.data.message)
+				} else {
+					setApiError(`Помилка сервера (${error.response.status}). Спробуйте пізніше.`)
+				}
+			} else if (error.request) {
+				// Запит був зроблений, але відповіді не отримано
+				setNetworkError(true)
+			} else {
+				// Щось пішло не так при налаштуванні запиту
+				setApiError('Виникла неочікувана помилка. Спробуйте пізніше.')
 			}
-		} catch (error) {
-			// TODO
+		} finally {
+			setLoading(false)
 		}
 	}
 
 	return (
 		<View style={styles.container}>
-			<Text
-				variant="headlineMedium"
-				style={styles.title}
-			>
-				Login
-			</Text>
+			<Text className="text-center mb-5 font-bold text-2xl">Вхід</Text>
 
-			<Controller
-				control={control}
-				name="email"
-				defaultValue=""
-				rules={{ required: 'Email is required' }}
-				render={({ field: { onChange, onBlur, value } }) => (
-					<TextInput
-						label="Email"
-						keyboardType="email-address"
-						autoCapitalize="none"
-						onBlur={onBlur}
-						onChangeText={onChange}
-						value={value || ''}
-						style={styles.input}
-					/>
-				)}
-			/>
-			{errors.email && (
-				<Text style={styles.error}>
-					{errors.email?.message && (
-						<Text style={styles.error}>{String(errors.email.message)}</Text>
-					)}
-				</Text>
+			{networkError && (
+				<Alert
+					variant="destructive"
+					className="mb-4"
+				>
+					<AlertTitle>Помилка мережі</AlertTitle>
+					<AlertDescription>
+						Не вдалося з'єднатися з сервером. Перевірте підключення до інтернету та спробуйте знову.
+					</AlertDescription>
+				</Alert>
 			)}
 
-			<Controller
-				control={control}
-				name="password"
-				defaultValue=""
-				rules={{ required: 'Password is required' }}
-				render={({ field: { onChange, onBlur, value } }) => (
-					<TextInput
-						label="Password"
-						secureTextEntry
-						onBlur={onBlur}
-						onChangeText={onChange}
-						value={value || ''}
-						style={styles.input}
-					/>
-				)}
-			/>
-			{errors.password && (
-				<Text style={styles.error}>
-					{errors.password?.message && (
-						<Text style={styles.error}>{String(errors.password.message)}</Text>
-					)}
-				</Text>
+			{apiError && (
+				<Alert
+					variant="destructive"
+					className="mb-4"
+				>
+					<AlertTitle>Помилка входу</AlertTitle>
+					<AlertDescription>{apiError}</AlertDescription>
+				</Alert>
 			)}
+
+			<View className="mb-4">
+				<Label
+					htmlFor="email"
+					className="mb-2"
+				>
+					Email
+				</Label>
+				<Controller
+					control={control}
+					name="email"
+					defaultValue=""
+					rules={{
+						required: "Email обов'язковий",
+						pattern: {
+							value: /^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$/i,
+							message: 'Невірний формат email'
+						}
+					}}
+					render={({ field: { onChange, onBlur, value } }) => (
+						<Input
+							id="email"
+							placeholder="Введіть ваш email"
+							keyboardType="email-address"
+							autoCapitalize="none"
+							onBlur={onBlur}
+							onChangeText={onChange}
+							value={value || ''}
+							className="bg-background"
+						/>
+					)}
+				/>
+				{errors.email && (
+					<Text className="text-destructive mt-1 text-sm">{errors.email?.message as string}</Text>
+				)}
+			</View>
+
+			<View className="mb-4">
+				<Label
+					htmlFor="password"
+					className="mb-2"
+				>
+					Пароль
+				</Label>
+				<Controller
+					control={control}
+					name="password"
+					defaultValue=""
+					rules={{ required: "Пароль обов'язковий" }}
+					render={({ field: { onChange, onBlur, value } }) => (
+						<Input
+							id="password"
+							placeholder="Введіть ваш пароль"
+							secureTextEntry
+							onBlur={onBlur}
+							onChangeText={onChange}
+							value={value || ''}
+							className="bg-background"
+						/>
+					)}
+				/>
+				{errors.password && (
+					<Text className="text-destructive mt-1 text-sm">
+						{errors.password?.message as string}
+					</Text>
+				)}
+			</View>
 
 			<Button
-				mode="contained"
+				variant="default"
 				onPress={handleSubmit(onSubmit)}
-				style={styles.button}
+				className="mt-2 bg-primary"
+				disabled={loading}
 			>
-				Login
+				{loading ? (
+					<ActivityIndicator color="white" />
+				) : (
+					<Text className="text-primary-foreground">Увійти</Text>
+				)}
 			</Button>
+
+			<View className="mt-4 flex-row justify-center">
+				<Text className="text-muted-foreground">Немає облікового запису? </Text>
+				<Text
+					className="text-primary font-medium"
+					onPress={() => router.push('/register')}
+				>
+					Зареєструватися
+				</Text>
+			</View>
 		</View>
 	)
 }
 
 const styles = StyleSheet.create({
-	container: { flex: 1, justifyContent: 'center', padding: 20 },
-	title: { textAlign: 'center', marginBottom: 20 },
-	input: { marginBottom: 10 },
-	button: { marginTop: 10 },
-	error: { color: 'red', marginBottom: 10 }
+	container: {
+		flex: 1,
+		justifyContent: 'center',
+		padding: 20,
+		backgroundColor: '#f5f5f5'
+	}
 })

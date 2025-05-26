@@ -1,92 +1,88 @@
 import React from 'react'
-import { View, Text, Image, StyleSheet, TouchableOpacity } from 'react-native'
+import { View, Image, TouchableOpacity } from 'react-native'
+import AsyncStorage from '@react-native-async-storage/async-storage'
+import { useRouter } from 'expo-router'
+import axios from 'axios'
+
+// Імпортуємо компоненти з shadcn/ui
+import { Text } from '@/components/Text'
+import { Button } from '@/components/Button'
+import { Card, CardContent } from '@/components/Card'
+import { useColorScheme } from 'nativewind'
 
 const ProfileScreen = () => {
 	const user = {
 		name: 'John Doe',
 		email: 'john.doe@example.com',
-		profilePic: 'https://via.placeholder.com/150' // Replace with actual image URL
+		profilePic: 'https://via.placeholder.com/150' // Замінити на реальний URL зображення
 	}
 
-	const handleLogout = () => {
-		// Logout logic here
+	const router = useRouter()
+	const { colorScheme } = useColorScheme()
+	const isDark = colorScheme === 'dark'
+
+	const handleLogout = async () => {
+		try {
+			// Видаляємо токен з AsyncStorage
+			await AsyncStorage.removeItem('auth_token')
+
+			// Видаляємо заголовок Authorization з axios (якщо він був доданий)
+			delete axios.defaults.headers['Authorization']
+
+			// Навігація до сторінки входу
+			router.push('/login')
+		} catch (error) {
+			console.error('Error during logout:', error)
+			alert('Failed to log out. Please try again.')
+		}
 	}
 
 	return (
-		<View style={styles.container}>
-			<View style={styles.container_top}>
-				<Image
-					source={{ uri: user.profilePic }}
-					style={styles.profilePic}
-				/>
-				<View style={styles.textContainer}>
-					<Text style={styles.name}>{user.name}</Text>
-					<Text style={styles.email}>{user.email}</Text>
-				</View>
-			</View>
+		<View className="flex-1 p-4 bg-background">
+			<Card className="mb-6">
+				<CardContent className="p-4">
+					<View className="flex-row items-center">
+						<Image
+							source={{ uri: user.profilePic }}
+							className="w-20 h-20 rounded-full border-2 border-border"
+						/>
+						<View className="ml-4">
+							<Text className="text-xl font-semibold text-foreground">{user.name}</Text>
+							<Text className="text-sm text-muted-foreground mt-1">{user.email}</Text>
+						</View>
+					</View>
+				</CardContent>
+			</Card>
 
-			<TouchableOpacity
-				style={styles.logoutButton}
-				onPress={handleLogout}
-			>
-				<Text style={styles.logoutText}>Logout</Text>
-			</TouchableOpacity>
+			<Card className="mb-6">
+				<CardContent className="p-4">
+					<Text className="text-lg font-medium text-foreground mb-2">Account Settings</Text>
+
+					<TouchableOpacity className="py-3 border-b border-border">
+						<Text className="text-foreground">Edit Profile</Text>
+					</TouchableOpacity>
+
+					<TouchableOpacity className="py-3 border-b border-border">
+						<Text className="text-foreground">Change Password</Text>
+					</TouchableOpacity>
+
+					<TouchableOpacity className="py-3">
+						<Text className="text-foreground">Notifications</Text>
+					</TouchableOpacity>
+				</CardContent>
+			</Card>
+
+			<View className="flex-1 justify-end mb-6">
+				<Button
+					variant="destructive"
+					onPress={handleLogout}
+					className="w-full"
+				>
+					<Text className="text-destructive-foreground font-medium">Logout</Text>
+				</Button>
+			</View>
 		</View>
 	)
 }
-
-const styles = StyleSheet.create({
-	container: {
-		flex: 1,
-		padding: 20,
-		backgroundColor: '#F1F3F4'
-	},
-	container_top: {
-		flexDirection: 'row',
-		alignItems: 'center',
-		borderBottomWidth: 1,
-		borderBottomColor: '#ccc',
-		paddingBottom: 20,
-		marginBottom: 20
-	},
-	profilePic: {
-		width: 80,
-		height: 80,
-		borderRadius: 40,
-		borderWidth: 2,
-		borderColor: '#ffffff',
-		shadowColor: '#000',
-		shadowOffset: { width: 0, height: 4 },
-		shadowOpacity: 0.1,
-		shadowRadius: 6
-	},
-	textContainer: {
-		marginLeft: 15
-	},
-	name: {
-		fontSize: 22,
-		fontWeight: '600',
-		color: '#333'
-	},
-	email: {
-		fontSize: 16,
-		color: '#777',
-		marginTop: 5
-	},
-	logoutButton: {
-		flexDirection: 'row',
-		alignItems: 'center',
-		backgroundColor: '#FF4C4C',
-		paddingVertical: 8,
-		paddingHorizontal: 20,
-		borderRadius: 20,
-		alignSelf: 'center'
-	},
-	logoutText: {
-		color: '#fff',
-		fontSize: 16,
-		fontWeight: '500'
-	}
-})
 
 export default ProfileScreen
